@@ -127,7 +127,7 @@ export default function PartyBubbleChart({ data, isLoading }: PartyBubbleChartPr
 
     return {
       type: 'scatter' as const,
-      mode: 'markers+text' as const,
+      mode: 'text+markers' as const,
       x: [item.x],
       y: [item.y],
       text: showLabel ? [item.party.party_name.split(' ')[0]] : [''],
