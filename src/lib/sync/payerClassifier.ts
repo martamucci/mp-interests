@@ -14,6 +14,16 @@ interface ClassificationResult {
 
 // Default classification rules
 const DEFAULT_RULES: ClassificationRule[] = [
+  // HIGHEST PRIORITY: Legal entity suffixes - these ALWAYS indicate a company
+  // Any name containing Ltd, Limited, PLC is definitively a company, regardless of country names
+  { pattern: /\b(ltd|limited)\.?\s*$/i, type: 'Company', priority: 100 },
+  { pattern: /\b(ltd|limited)\b\.?/i, type: 'Company', priority: 100 },
+  { pattern: /\bplc\b\.?/i, type: 'Company', subtype: 'Public Company', priority: 100 },
+  { pattern: /\bllp\b\.?/i, type: 'Company', subtype: 'Partnership', priority: 100 },
+  { pattern: /\binc\.?\b/i, type: 'Company', priority: 100 },
+  { pattern: /\bcorp(oration)?\.?\b/i, type: 'Company', priority: 100 },
+  { pattern: /\bGmbH\b/i, type: 'Company', subtype: 'German Company', priority: 100 },
+
   // Governments - High priority (must have explicit government indicators)
   { pattern: /\bgovernment of\b/i, type: 'Government', subtype: 'Foreign Government', priority: 10 },
   { pattern: /\bembassy of\b/i, type: 'Government', subtype: 'Embassy', priority: 10 },
@@ -43,15 +53,8 @@ const DEFAULT_RULES: ClassificationRule[] = [
   { pattern: /\bcouncil\b/i, type: 'Government', subtype: 'Local Government', priority: 6 },
   { pattern: /\bauthority\b/i, type: 'Government', subtype: 'Public Authority', priority: 5 },
 
-  // Companies - Highest priority for legal entity suffixes (must override all other patterns)
-  { pattern: /\b(ltd|limited)\.?\s*$/i, type: 'Company', priority: 12 },
-  { pattern: /\b(ltd|limited)\b\.?/i, type: 'Company', priority: 12 },
-  { pattern: /\bplc\b\.?/i, type: 'Company', subtype: 'Public Company', priority: 12 },
-  { pattern: /\bfriends of\b/i, type: 'Company', subtype: 'Advocacy Group', priority: 11 },
-  { pattern: /\bllp\b\.?$/i, type: 'Company', subtype: 'Partnership', priority: 8 },
-  { pattern: /\binc\.?\b$/i, type: 'Company', priority: 8 },
-  { pattern: /\bcorp(oration)?\.?\b$/i, type: 'Company', priority: 8 },
-  { pattern: /\bGmbH\b/i, type: 'Company', subtype: 'German Company', priority: 8 },
+  // Companies - Other patterns
+  { pattern: /\bfriends of\b/i, type: 'Company', subtype: 'Advocacy Group', priority: 50 },
   { pattern: /\b(SA|AG)\b$/i, type: 'Company', priority: 7 },
   { pattern: /\bholdings\b/i, type: 'Company', subtype: 'Holding Company', priority: 6 },
   { pattern: /\bgroup\b$/i, type: 'Company', priority: 5 },
