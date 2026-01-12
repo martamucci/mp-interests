@@ -1,0 +1,154 @@
+{
+  "overrides": [
+    {
+      "pattern": "government of",
+      "type": "Government",
+      "subtype": "Foreign Government"
+    },
+    {
+      "pattern": "ministry of foreign affairs",
+      "type": "Government",
+      "subtype": "Foreign Government"
+    },
+    {
+      "pattern": "mofa",
+      "type": "Government",
+      "subtype": "Foreign Government"
+    },
+    {
+      "pattern": "federal department",
+      "type": "Government",
+      "subtype": "Foreign Government"
+    },
+    {
+      "pattern": "royal embassy",
+      "type": "Government",
+      "subtype": "Embassy"
+    },
+    {
+      "pattern": "high commission",
+      "type": "Government",
+      "subtype": "Embassy"
+    },
+    {
+      "pattern": "nhs",
+      "type": "Government",
+      "subtype": "UK Public Body"
+    },
+    {
+      "pattern": "national health service",
+      "type": "Government",
+      "subtype": "UK Public Body"
+    },
+    {
+      "pattern": "bbc",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "sky",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "times radio",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "lbc",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "gb news",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "news uk",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "daily mail",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "associated newspapers",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "telegraph media",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "guardian media",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "financial times",
+      "type": "Company",
+      "subtype": "Media"
+    },
+    {
+      "pattern": "unite the union",
+      "type": "Company",
+      "subtype": "Trade Union"
+    },
+    {
+      "pattern": "gmb",
+      "type": "Company",
+      "subtype": "Trade Union"
+    },
+    {
+      "pattern": "unison",
+      "type": "Company",
+      "subtype": "Trade Union"
+    },
+    {
+      "pattern": "usdaw",
+      "type": "Company",
+      "subtype": "Trade Union"
+    },
+    {
+      "pattern": "communication workers union",
+      "type": "Company",
+      "subtype": "Trade Union"
+    },
+    {
+      "pattern": "cwu",
+      "type": "Company",
+      "subtype": "Trade Union"
+    },
+    {
+      "pattern": "qatar airways",
+      "type": "Company",
+      "subtype": "Airline"
+    },
+    {
+      "pattern": "emirates",
+      "type": "Company",
+      "subtype": "Airline"
+    },
+    {
+      "pattern": "singapore airlines",
+      "type": "Company",
+      "subtype": "Airline"
+    },
+    {
+      "pattern": "etihad",
+      "type": "Company",
+      "subtype": "Airline"
+    },
+    {
+      "pattern": "saudi aramco",
+      "type": "Company",
+      "subtype": "Energy"
+    }
+  ]
+}
