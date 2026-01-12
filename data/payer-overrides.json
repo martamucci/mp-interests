@@ -149,6 +149,21 @@
       "pattern": "saudi aramco",
       "type": "Company",
       "subtype": "Energy"
+    },
+    {
+      "pattern": "conservative friends of israel",
+      "type": "Company",
+      "subtype": "Advocacy Group"
+    },
+    {
+      "pattern": "labour friends of israel",
+      "type": "Company",
+      "subtype": "Advocacy Group"
+    },
+    {
+      "pattern": "liberal democrat friends of israel",
+      "type": "Company",
+      "subtype": "Advocacy Group"
     }
   ]
 }

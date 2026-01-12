@@ -43,9 +43,10 @@ const DEFAULT_RULES: ClassificationRule[] = [
   { pattern: /\bcouncil\b/i, type: 'Government', subtype: 'Local Government', priority: 6 },
   { pattern: /\bauthority\b/i, type: 'Government', subtype: 'Public Authority', priority: 5 },
 
-  // Companies - Medium priority (these patterns should take precedence over vague matches)
-  { pattern: /\b(ltd|limited)\b\.?/i, type: 'Company', priority: 11 },
-  { pattern: /\bplc\b\.?/i, type: 'Company', subtype: 'Public Company', priority: 11 },
+  // Companies - Highest priority for legal entity suffixes (must override all other patterns)
+  { pattern: /\b(ltd|limited)\.?\s*$/i, type: 'Company', priority: 12 },
+  { pattern: /\b(ltd|limited)\b\.?/i, type: 'Company', priority: 12 },
+  { pattern: /\bplc\b\.?/i, type: 'Company', subtype: 'Public Company', priority: 12 },
   { pattern: /\bfriends of\b/i, type: 'Company', subtype: 'Advocacy Group', priority: 11 },
   { pattern: /\bllp\b\.?$/i, type: 'Company', subtype: 'Partnership', priority: 8 },
   { pattern: /\binc\.?\b$/i, type: 'Company', priority: 8 },
