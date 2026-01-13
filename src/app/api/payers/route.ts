@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAPIClient } from '@/lib/supabase/server'
 
-export const revalidate = 3600
+export const revalidate = 0 // Disable caching to ensure fresh data
 
 export async function GET(request: NextRequest) {
   try {

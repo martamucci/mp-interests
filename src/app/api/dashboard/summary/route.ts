@@ -17,7 +17,7 @@ const INTEREST_CATEGORIES = [
   'Family members engaged in third-party lobbying',
 ]
 
-export const revalidate = 3600 // Revalidate every hour
+export const revalidate = 0 // Disable caching to ensure fresh data
 
 export async function GET() {
   try {
