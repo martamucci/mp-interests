@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Table from '@/components/ui/Table'
 import Card from '@/components/ui/Card'
+import Select from '@/components/ui/Select'
 import Skeleton from '@/components/ui/Skeleton'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate } from '@/lib/utils/dates'
@@ -29,8 +30,14 @@ function isDonationOrGiftCategory(category: string): boolean {
 
 export default function LatestInterestsPage() {
   const [page, setPage] = useState(1)
+  const [party, setParty] = useState('')
 
-  const { data, isLoading, error } = useLatestInterests({ page, limit: 50 })
+  const { data, isLoading, error } = useLatestInterests({ page, limit: 50, party })
+
+  const handlePartyChange = (value: string) => {
+    setParty(value)
+    setPage(1) // Reset to first page when filter changes
+  }
 
   if (error) {
     return (
@@ -56,7 +63,7 @@ export default function LatestInterestsPage() {
       header: 'MP',
       render: (item: LatestInterest) => (
         <Link
-          href={`/mps/${item.member.id}`}
+          href={`/mps/${item.member.id}?from=latest`}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
         >
           {item.member.thumbnailUrl ? (
@@ -185,10 +192,30 @@ export default function LatestInterestsPage() {
         </p>
       </div>
 
+      {/* Filter */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <Select
+          value={party}
+          onChange={handlePartyChange}
+          options={(data?.filterOptions?.parties || []).map((p) => ({ value: p, label: p }))}
+          placeholder="All parties"
+          className="min-w-[200px]"
+        />
+        {party && (
+          <button
+            onClick={() => handlePartyChange('')}
+            className="text-sm text-violet hover:underline"
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
+
       {/* Results count */}
       {data && (
         <p className="text-sm text-dark-grey">
           Showing {data.data.length} of {data.pagination.total} interests from the past month
+          {party && ` for ${party}`}
         </p>
       )}
 

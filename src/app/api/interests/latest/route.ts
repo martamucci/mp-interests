@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
+    const party = searchParams.get('party') || ''
     const offset = (page - 1) * limit
 
     const supabase = createAPIClient()
@@ -67,19 +68,25 @@ export async function GET(request: NextRequest) {
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
     const oneMonthAgoStr = oneMonthAgo.toISOString().split('T')[0]
 
-    // Fetch recent interests with member and category info
-    // Use registration_date for filtering
-    const { data: interests, error: interestsError, count } = await supabase
+    // Build query - use !inner join when filtering by party
+    let query = supabase
       .from('interests')
       .select(`
         id,
         summary,
         registration_date,
         raw_fields,
-        member:members(id, name_display, party_name, party_color, constituency, thumbnail_url),
+        member:members!inner(id, name_display, party_name, party_color, constituency, thumbnail_url),
         category:categories(id, name)
       `, { count: 'exact' })
       .gte('registration_date', oneMonthAgoStr)
+
+    // Add party filter if specified
+    if (party) {
+      query = query.eq('member.party_name', party)
+    }
+
+    const { data: interests, error: interestsError, count } = await query
       .order('registration_date', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -166,6 +173,28 @@ export async function GET(request: NextRequest) {
 
     const totalPages = count ? Math.ceil(count / limit) : 1
 
+    // Get unique parties from the results for filter options
+    const partiesSet = new Set<string>()
+    for (const interest of typedInterests) {
+      if (interest.member?.party_name) {
+        partiesSet.add(interest.member.party_name)
+      }
+    }
+
+    // Also fetch all parties that have recent interests (for complete filter list)
+    const { data: allRecentParties } = await supabase
+      .from('interests')
+      .select('member:members!inner(party_name)')
+      .gte('registration_date', oneMonthAgoStr)
+
+    const allPartiesSet = new Set<string>()
+    for (const item of allRecentParties || []) {
+      const member = (item as unknown as { member: { party_name: string } | null }).member
+      if (member?.party_name) {
+        allPartiesSet.add(member.party_name)
+      }
+    }
+
     return NextResponse.json({
       data: processedInterests,
       pagination: {
@@ -173,6 +202,9 @@ export async function GET(request: NextRequest) {
         limit,
         total: count || 0,
         totalPages,
+      },
+      filterOptions: {
+        parties: Array.from(allPartiesSet).sort(),
       },
     })
   } catch (error) {

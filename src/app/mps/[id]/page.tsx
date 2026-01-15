@@ -17,8 +17,17 @@ export default function MPDetailPage({ params }: { params: { id: string } | Prom
   const searchParams = useSearchParams()
   const from = searchParams.get('from')
 
-  const backLink = from === 'dashboard' ? '/' : '/mps'
-  const backLabel = from === 'dashboard' ? '← Back to Dashboard' : '← Back to MPs'
+  const getBackInfo = () => {
+    switch (from) {
+      case 'dashboard':
+        return { link: '/', label: '← Back to Dashboard' }
+      case 'latest':
+        return { link: '/latest', label: '← Back to Latest Interests' }
+      default:
+        return { link: '/mps', label: '← Back to MPs' }
+    }
+  }
+  const { link: backLink, label: backLabel } = getBackInfo()
 
   const { data, isLoading, error } = useMPDetail(id)
 

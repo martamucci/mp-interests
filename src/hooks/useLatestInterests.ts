@@ -35,15 +35,19 @@ export interface LatestInterestsResponse {
     total: number
     totalPages: number
   }
+  filterOptions: {
+    parties: string[]
+  }
 }
 
 interface UseLatestInterestsOptions {
   page?: number
   limit?: number
+  party?: string
 }
 
 export function useLatestInterests(options: UseLatestInterestsOptions = {}) {
-  const { page = 1, limit = 50 } = options
+  const { page = 1, limit = 50, party = '' } = options
 
   const [data, setData] = useState<LatestInterestsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -57,6 +61,8 @@ export function useLatestInterests(options: UseLatestInterestsOptions = {}) {
         page: String(page),
         limit: String(limit),
       })
+
+      if (party) params.set('party', party)
 
       const response = await fetch(`/api/interests/latest?${params}`)
 
@@ -72,7 +78,7 @@ export function useLatestInterests(options: UseLatestInterestsOptions = {}) {
     } finally {
       setIsLoading(false)
     }
-  }, [page, limit])
+  }, [page, limit, party])
 
   useEffect(() => {
     fetchData()
