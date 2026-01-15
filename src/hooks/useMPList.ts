@@ -8,10 +8,11 @@ interface UseMPListOptions {
   limit?: number
   party?: string
   search?: string
+  sort?: 'az' | 'high'
 }
 
 export function useMPList(options: UseMPListOptions = {}) {
-  const { page = 1, limit = 50, party = '', search = '' } = options
+  const { page = 1, limit = 50, party = '', search = '', sort = 'az' } = options
 
   const [data, setData] = useState<MPListResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -24,6 +25,7 @@ export function useMPList(options: UseMPListOptions = {}) {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),
+        sort,
       })
 
       if (party) params.set('party', party)
@@ -43,7 +45,7 @@ export function useMPList(options: UseMPListOptions = {}) {
     } finally {
       setIsLoading(false)
     }
-  }, [page, limit, party, search])
+  }, [page, limit, party, search, sort])
 
   useEffect(() => {
     fetchData()

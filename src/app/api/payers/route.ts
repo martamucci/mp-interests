@@ -34,6 +34,11 @@ export async function GET(request: NextRequest) {
       return fallbackToMaterializedView(supabase, payerType, search, subtype, sort, limit, offset)
     }
 
+    // Filter out payers with no payments
+    const filteredStats = (payerStats || []).filter(
+      (p: { total_paid: number; payment_count: number }) => p.total_paid > 0 || p.payment_count > 0
+    )
+
     // Get total count
     const { count, error: countError } = await supabase
       .from('payers')
@@ -58,12 +63,12 @@ export async function GET(request: NextRequest) {
     )].sort()
 
     return NextResponse.json({
-      data: payerStats || [],
+      data: filteredStats,
       pagination: {
         page,
         limit,
-        total: payerStats?.length || 0,
-        totalPages: Math.ceil((payerStats?.length || 0) / limit),
+        total: filteredStats.length,
+        totalPages: Math.ceil(filteredStats.length / limit),
       },
       subtypes,
     })
@@ -97,7 +102,7 @@ async function fallbackToMaterializedView(
       name,
       payer_type,
       payer_subtype,
-      payments!inner(amount)
+      payments!inner(amount, member_id)
     `)
 
   if (payerType) {
@@ -144,15 +149,20 @@ async function fallbackToMaterializedView(
       if (payment.amount) {
         entry.total_paid += payment.amount
         entry.payment_count++
+        if (payment.member_id) {
+          entry.mp_count.add(payment.member_id)
+        }
       }
     }
   }
 
-  // Convert to array and sort
-  let payers = Array.from(payerMap.values()).map(p => ({
-    ...p,
-    mp_count: p.mp_count.size
-  }))
+  // Convert to array, filter out zero payments, and sort
+  let payers = Array.from(payerMap.values())
+    .map(p => ({
+      ...p,
+      mp_count: p.mp_count.size
+    }))
+    .filter(p => p.total_paid > 0 || p.payment_count > 0)
 
   payers.sort((a, b) => sort === 'low'
     ? a.total_paid - b.total_paid

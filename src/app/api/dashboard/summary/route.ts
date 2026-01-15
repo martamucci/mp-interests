@@ -26,7 +26,7 @@ export async function GET() {
     // Fetch all data in parallel
     const [
       partyTotalsResult,
-      topPayersResult,
+      payersWithPaymentsResult,
       categoriesResult,
       partiesResult,
       lastSyncResult,
@@ -34,13 +34,66 @@ export async function GET() {
       topEarnersResult,
     ] = await Promise.all([
       supabase.from('mv_party_totals').select('*').order('total_amount', { ascending: false }),
-      supabase.from('mv_top_payers').select('*'),
+      // Use live data from payers table instead of stale materialized view
+      supabase.from('payers').select(`
+        id,
+        name,
+        payer_type,
+        payer_subtype,
+        payments(amount, member_id)
+      `),
       supabase.from('categories').select('id, name'),
       supabase.from('members').select('party_name').eq('is_current', true),
       supabase.from('sync_log').select('completed_at').eq('status', 'completed').order('completed_at', { ascending: false }).limit(1),
       // Get top earners aggregated by member with total amounts
       supabase.rpc('get_top_earners_by_member', { limit_count: 100 }),
     ])
+
+    // Aggregate payer data from live query
+    const payerMap = new Map<number, {
+      payer_id: number
+      name: string
+      payer_type: string
+      payer_subtype: string | null
+      total_paid: number
+      mp_count: Set<number>
+      payment_count: number
+    }>()
+
+    for (const payer of payersWithPaymentsResult.data || []) {
+      if (!payerMap.has(payer.id)) {
+        payerMap.set(payer.id, {
+          payer_id: payer.id,
+          name: payer.name,
+          payer_type: payer.payer_type,
+          payer_subtype: payer.payer_subtype,
+          total_paid: 0,
+          mp_count: new Set(),
+          payment_count: 0
+        })
+      }
+      const entry = payerMap.get(payer.id)!
+      for (const payment of payer.payments || []) {
+        if (payment.amount) {
+          entry.total_paid += payment.amount
+          entry.payment_count++
+          if (payment.member_id) {
+            entry.mp_count.add(payment.member_id)
+          }
+        }
+      }
+    }
+
+    // Convert to array with proper mp_count
+    const topPayersResult = {
+      data: Array.from(payerMap.values())
+        .map(p => ({
+          ...p,
+          mp_count: p.mp_count.size
+        }))
+        .filter(p => p.total_paid > 0)
+        .sort((a, b) => b.total_paid - a.total_paid)
+    }
 
     // Extract unique parties
     const parties = [...new Set(partiesResult.data?.map(p => p.party_name))] as string[]

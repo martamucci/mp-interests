@@ -25,6 +25,24 @@ function formatFullCurrency(amount: number): string {
   return '£' + amount.toLocaleString('en-GB', { maximumFractionDigits: 0 })
 }
 
+function getPartyShortName(partyName: string): string {
+  const shortNames: Record<string, string> = {
+    'Liberal Democrats': 'Lib Dems',
+    'Liberal Democrat': 'Lib Dems',
+    'Democratic Unionist Party': 'DUP',
+    'Scottish National Party': 'SNP',
+    'Plaid Cymru': 'Plaid',
+    'Social Democratic and Labour Party': 'SDLP',
+    'Alliance Party of Northern Ireland': 'Alliance',
+    'Yorkshire Party': 'YP',
+  }
+  // Check for partial matches for party names starting with certain words
+  if (partyName.toLowerCase().startsWith('your')) {
+    return 'YP'
+  }
+  return shortNames[partyName] || partyName.split(' ')[0]
+}
+
 interface TooltipData {
   party: PartyTotal
   percentage: number
@@ -151,23 +169,39 @@ export default function PartyBubbleChart({ data, isLoading }: PartyBubbleChartPr
 
   const traces: Plotly.Data[] = chartData.map((item, index) => {
     const partyColor = item.party.party_color || getPartyColor(item.party.party_name)
-    const showLabel = item.size > 60
     const isHovered = hoveredIndex === index
 
     // Apply hover scaling effect
     const hoverScale = isHovered ? 1.15 : 1
     const animatedSize = item.size * hoverScale
 
+    // Get the label text
+    const labelText = getPartyShortName(item.party.party_name)
+
+    // Calculate max font size that fits within bubble with 2mm (~8px) margin on each side
+    // Bubble diameter in pixels, minus margin, divided by text length to get approximate char width
+    const bubbleRadius = animatedSize / 2
+    const marginPx = 8 // ~2mm margin
+    const availableWidth = (bubbleRadius - marginPx) * 2
+    const maxFontByWidth = Math.floor(availableWidth / (labelText.length * 0.6))
+    const maxFontByHeight = Math.floor((bubbleRadius - marginPx) * 1.2)
+
+    // Use smaller of width-based or height-based calculation, with min 8 and max 18
+    const fontSize = Math.min(18, Math.max(8, Math.min(maxFontByWidth, maxFontByHeight)))
+
+    // Only show label if it can fit reasonably (font size >= 8)
+    const showLabel = fontSize >= 8 && item.size > 40
+
     return {
       type: 'scatter' as const,
       mode: 'text+markers' as const,
       x: [item.x],
       y: [item.y],
-      text: showLabel ? [item.party.party_name.split(' ')[0]] : [''],
+      text: showLabel ? [labelText] : [''],
       textposition: 'middle center' as const,
       textfont: {
         color: '#ffffff',
-        size: Math.max(9, animatedSize / 6),
+        size: fontSize,
         family: 'Inter, system-ui, sans-serif',
         weight: 600,
       },

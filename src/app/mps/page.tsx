@@ -10,8 +10,9 @@ export default function MPsPage() {
   const [party, setParty] = useState('')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [sort, setSort] = useState<'az' | 'high'>('az')
 
-  const { data, isLoading, error } = useMPList({ page, party, search })
+  const { data, isLoading, error } = useMPList({ page, party, search, sort })
 
   const handleSearch = () => {
     setSearch(searchInput)
@@ -26,6 +27,11 @@ export default function MPsPage() {
 
   const handlePartyChange = (value: string) => {
     setParty(value)
+    setPage(1)
+  }
+
+  const handleSortChange = (value: string) => {
+    setSort(value as 'az' | 'high')
     setPage(1)
   }
 
@@ -67,6 +73,16 @@ export default function MPsPage() {
           options={(data?.filterOptions.parties || []).map((p) => ({ value: p, label: p }))}
           placeholder="All parties"
           className="min-w-[200px]"
+        />
+        <Select
+          value={sort}
+          onChange={handleSortChange}
+          options={[
+            { value: 'az', label: 'A to Z' },
+            { value: 'high', label: 'High to Low' },
+          ]}
+          placeholder="Sort by"
+          className="min-w-[150px]"
         />
         <button onClick={handleSearch} className="btn-primary">
           Search
