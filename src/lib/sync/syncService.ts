@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { fetchAllCurrentMPs } from '@/lib/parliament-api/members'
-import { fetchAllInterests, fetchCategories, fetchInterestsByCategory } from '@/lib/parliament-api/interests'
+import { fetchAllInterests, fetchCategories, fetchInterestsByMemberAndCategory } from '@/lib/parliament-api/interests'
 import { extractPaymentsFromInterest } from './paymentExtractor'
 import { getPayerClassifier } from './payerClassifier'
 import type { ParliamentMember, PublishedInterest, InterestCategory } from '@/types/parliament'
@@ -168,19 +168,46 @@ export class SyncService {
     // Fetch all interests (bulk fetch - childInterests not included)
     const interests = await fetchAllInterests(memberIds)
 
-    // Fetch Employment interests by category to get childInterests with payment amounts
-    // The Parliament API only returns childInterests when filtering by CategoryId
+    // The Parliament API only reliably returns childInterests when querying by BOTH MemberId AND CategoryId
+    // We need to fetch Employment interests per-member to get all childInterests with payment amounts
     // Category 12 = "Employment and earnings"
-    console.log('Fetching Employment interests by category (for childInterests)...')
-    const employmentInterests = await fetchInterestsByCategory(12, memberIds)
+    console.log('Fetching Employment interests per member (for childInterests with payment amounts)...')
 
-    // Create a map of employment interests with childInterests
-    const employmentMap = new Map<number, PublishedInterest>()
-    for (const interest of employmentInterests) {
-      employmentMap.set(interest.id, interest)
+    // Get unique member IDs that have employment interests
+    const membersWithEmployment = new Set<number>()
+    for (const interest of interests) {
+      if (interest.category.id === 12) {
+        membersWithEmployment.add(interest.member.id)
+      }
     }
 
-    // Merge: replace bulk-fetched employment interests with category-fetched ones (which have childInterests)
+    console.log(`Found ${membersWithEmployment.size} members with Employment interests`)
+
+    // Fetch employment interests per member to get childInterests
+    const employmentMap = new Map<number, PublishedInterest>()
+    let memberCount = 0
+    for (const memberId of membersWithEmployment) {
+      memberCount++
+      if (memberCount % 50 === 0) {
+        console.log(`Fetching employment interests for member ${memberCount}/${membersWithEmployment.size}...`)
+      }
+
+      try {
+        const memberEmploymentInterests = await fetchInterestsByMemberAndCategory(memberId, 12)
+        for (const interest of memberEmploymentInterests) {
+          employmentMap.set(interest.id, interest)
+        }
+      } catch (error) {
+        this.errors.push(`Failed to fetch employment interests for member ${memberId}: ${error}`)
+      }
+
+      // Rate limiting - wait 100ms between members
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
+    console.log(`Fetched ${employmentMap.size} employment interests with childInterests`)
+
+    // Merge: replace bulk-fetched employment interests with per-member-fetched ones (which have childInterests)
     const mergedInterests = interests.map(interest => {
       if (interest.category.id === 12 && employmentMap.has(interest.id)) {
         return employmentMap.get(interest.id)!

@@ -87,6 +87,7 @@ export async function GET(
       .eq('payer_id', payerId)
       .not('amount', 'is', null)
       .order('amount', { ascending: false })
+      .limit(1000)
 
     if (paymentsError) throw paymentsError
 

@@ -35,7 +35,7 @@ const FIELD_MAPPINGS = {
     'Total',
   ],
   payer: ['Payer', 'Donor', 'Source', 'Name of donor', 'Name of payer', 'Organisation', 'Company'],
-  role: ['Job title', 'Role', 'Position', 'Work', 'Service', 'Description', 'Nature of work'],
+  role: ['Job title', 'Role', 'Position', 'Role, work or services', 'Nature of work'],
   hours: ['Hours worked', 'Hours', 'Time spent', 'Duration'],
   hoursPeriod: ['Period for hours worked', 'Period', 'Frequency'],
   address: ['Address', 'Address of payer', 'Address of donor', 'Registered address'],

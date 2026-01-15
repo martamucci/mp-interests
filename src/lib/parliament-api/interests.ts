@@ -153,7 +153,8 @@ export async function fetchMPInterests(memberId: number): Promise<PublishedInter
 }
 
 // Fetch interests by category (needed to get childInterests with payment amounts)
-// The Parliament API only returns childInterests when filtering by CategoryId
+// Note: The Parliament API only reliably returns childInterests when filtering by BOTH MemberId AND CategoryId
+// Use fetchInterestsByMemberAndCategory for reliable childInterests data
 export async function fetchInterestsByCategory(
   categoryId: number,
   memberIds?: Set<number>
@@ -180,6 +181,43 @@ export async function fetchInterestsByCategory(
       : response.items
 
     allInterests.push(...relevantInterests)
+    skip += take
+
+    if (skip >= response.totalResults) {
+      break
+    }
+
+    // Rate limiting - wait 100ms between requests
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  return allInterests
+}
+
+// Fetch interests by member AND category (reliably returns childInterests with payment amounts)
+// The Parliament API requires BOTH MemberId AND CategoryId to consistently return childInterests
+export async function fetchInterestsByMemberAndCategory(
+  memberId: number,
+  categoryId: number
+): Promise<PublishedInterest[]> {
+  const allInterests: PublishedInterest[] = []
+  let skip = 0
+  const take = 20
+
+  while (true) {
+    const response = await fetchInterests({
+      memberId,
+      categoryId,
+      skip,
+      take,
+      expandChildInterests: true,
+    })
+
+    if (!response.items || response.items.length === 0) {
+      break
+    }
+
+    allInterests.push(...response.items)
     skip += take
 
     if (skip >= response.totalResults) {
