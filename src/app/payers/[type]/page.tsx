@@ -22,7 +22,7 @@ interface PayersResponse {
 }
 
 const typeConfig: Record<string, { label: string; singular: string; dbType: string }> = {
-  governments: { label: 'Governments', singular: 'Government', dbType: 'Government' },
+  governments: { label: 'Government Entities', singular: 'Government Entity', dbType: 'Government' },
   companies: { label: 'Companies', singular: 'Company', dbType: 'Company' },
   individuals: { label: 'Individuals', singular: 'Individual', dbType: 'Individual' },
 }

@@ -16,7 +16,7 @@ interface TopPayersTableProps {
 }
 
 const typeLabels: Record<string, { label: string; slug: string }> = {
-  Government: { label: 'Governments', slug: 'governments' },
+  Government: { label: 'Government Entities', slug: 'governments' },
   Company: { label: 'Companies', slug: 'companies' },
   Individual: { label: 'Individuals', slug: 'individuals' },
 }
