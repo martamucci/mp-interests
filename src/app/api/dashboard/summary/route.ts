@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAPIClient } from '@/lib/supabase/server'
 import type { DashboardSummaryResponse } from '@/types/api'
-import type { TopEarner, PartyTotal } from '@/types/database'
+import type { TopEarner, PartyTotal, PayerType } from '@/types/database'
 
 // The 10 interest categories
 const INTEREST_CATEGORIES = [
@@ -108,8 +108,12 @@ export async function GET() {
       partyEntry.payment_count += memberPaymentCount
     }
 
-    // Convert party map to sorted array
+    // Convert party map to sorted array with avg_amount
     const partyTotals: PartyTotal[] = Array.from(partyMap.values())
+      .map(p => ({
+        ...p,
+        avg_amount: p.mp_count > 0 ? p.total_amount / p.mp_count : 0
+      }))
       .sort((a, b) => b.total_amount - a.total_amount)
 
     // Sort earners by total amount and get top 100
@@ -165,10 +169,11 @@ export async function GET() {
       }
     }
 
-    // Convert to array with proper mp_count
+    // Convert to array with proper mp_count and typed payer_type
     const allPayers = Array.from(payerMap.values())
       .map(p => ({
         ...p,
+        payer_type: p.payer_type as PayerType,
         mp_count: p.mp_count.size
       }))
       .filter(p => p.total_paid > 0)

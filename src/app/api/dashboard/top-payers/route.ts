@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAPIClient } from '@/lib/supabase/server'
 import type { TopPayersResponse } from '@/types/api'
+import type { PayerType } from '@/types/database'
 
 export const revalidate = 0 // Disable caching to ensure fresh data
 
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
     const payers = Array.from(payerMap.values())
       .map(p => ({
         ...p,
+        payer_type: p.payer_type as PayerType,
         mp_count: p.mp_count.size
       }))
       .filter(p => p.total_paid > 0)
