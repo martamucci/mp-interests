@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { fetchAllCurrentMPs } from '@/lib/parliament-api/members'
 import { fetchAllInterests, fetchCategories, fetchInterestsByCategory } from '@/lib/parliament-api/interests'
-import { extractPaymentFromInterest } from './paymentExtractor'
+import { extractPaymentsFromInterest } from './paymentExtractor'
 import { getPayerClassifier } from './payerClassifier'
 import type { ParliamentMember, PublishedInterest, InterestCategory } from '@/types/parliament'
 import type { Member, Category, Interest, Payment, Payer, PayerType } from '@/types/database'
@@ -222,77 +222,79 @@ export class SyncService {
     const payerMap = new Map<string, Omit<Payer, 'id' | 'created_at' | 'updated_at'>>()
 
     for (const interest of interests) {
-      const extracted = extractPaymentFromInterest(interest)
-      if (!extracted) continue
+      // Extract all payments from this interest (may include multiple from childInterests)
+      const extractedPayments = extractPaymentsFromInterest(interest)
+      if (extractedPayments.length === 0) continue
 
-      // Process payer
-      let payerId: number | null = null
-      if (extracted.payerName) {
-        const normalizedName = this.classifier.normalizeName(extracted.payerName)
+      for (const extracted of extractedPayments) {
+        // Process payer
+        if (extracted.payerName) {
+          const normalizedName = this.classifier.normalizeName(extracted.payerName)
 
-        if (!payerMap.has(normalizedName)) {
-          // Use API-provided status if available, otherwise classify
-          let payerType: PayerType
-          let payerSubtype: string | null = null
+          if (!payerMap.has(normalizedName)) {
+            // Use API-provided status if available, otherwise classify
+            let payerType: PayerType
+            let payerSubtype: string | null = null
 
-          if (extracted.payerStatus) {
-            // Map API status to our PayerType
-            const statusLower = extracted.payerStatus.toLowerCase()
-            if (statusLower === 'individual' || statusLower === 'private individual') {
-              payerType = 'Individual'
-            } else if (statusLower === 'company' || statusLower === 'corporate') {
-              payerType = 'Company'
-            } else if (statusLower.includes('government') || statusLower.includes('public')) {
-              payerType = 'Government'
+            if (extracted.payerStatus) {
+              // Map API status to our PayerType
+              const statusLower = extracted.payerStatus.toLowerCase()
+              if (statusLower === 'individual' || statusLower === 'private individual') {
+                payerType = 'Individual'
+              } else if (statusLower === 'company' || statusLower === 'corporate') {
+                payerType = 'Company'
+              } else if (statusLower.includes('government') || statusLower.includes('public')) {
+                payerType = 'Government'
+              } else {
+                // Fall back to classifier for unknown statuses
+                const classification = this.classifier.classify(extracted.payerName)
+                payerType = classification.type
+                payerSubtype = classification.subtype || null
+              }
             } else {
-              // Fall back to classifier for unknown statuses
+              // No API status, use classifier
               const classification = this.classifier.classify(extracted.payerName)
               payerType = classification.type
               payerSubtype = classification.subtype || null
             }
-          } else {
-            // No API status, use classifier
-            const classification = this.classifier.classify(extracted.payerName)
-            payerType = classification.type
-            payerSubtype = classification.subtype || null
+
+            payerMap.set(normalizedName, {
+              name: extracted.payerName,
+              normalized_name: normalizedName,
+              payer_type: payerType,
+              payer_subtype: payerSubtype,
+              address: extracted.payerAddress,
+              nature_of_business: extracted.payerNatureOfBusiness,
+              country: null,
+              is_manual_override: false,
+              override_reason: null,
+            })
           }
-
-          payerMap.set(normalizedName, {
-            name: extracted.payerName,
-            normalized_name: normalizedName,
-            payer_type: payerType,
-            payer_subtype: payerSubtype,
-            address: extracted.payerAddress,
-            nature_of_business: extracted.payerNatureOfBusiness,
-            country: null,
-            is_manual_override: false,
-            override_reason: null,
-          })
         }
-      }
 
-      payments.push({
-        interest_id: extracted.interestId,
-        member_id: extracted.memberId,
-        category_id: extracted.categoryId,
-        amount: extracted.amount,
-        amount_raw: extracted.amountRaw,
-        currency: 'GBP',
-        payment_type: extracted.paymentType,
-        regularity: extracted.regularity,
-        role_description: extracted.roleDescription,
-        hours_worked: extracted.hoursWorked,
-        hours_period: extracted.hoursPeriod,
-        hourly_rate: extracted.hourlyRate,
-        payer_id: null, // Will be updated after payer insert
-        payer_name: extracted.payerName,
-        payer_address: extracted.payerAddress,
-        payer_nature_of_business: extracted.payerNatureOfBusiness,
-        start_date: extracted.startDate,
-        end_date: extracted.endDate,
-        received_date: extracted.receivedDate,
-        is_donated: extracted.isDonated,
-      })
+        payments.push({
+          interest_id: extracted.interestId,
+          member_id: extracted.memberId,
+          category_id: extracted.categoryId,
+          amount: extracted.amount,
+          amount_raw: extracted.amountRaw,
+          currency: 'GBP',
+          payment_type: extracted.paymentType,
+          regularity: extracted.regularity,
+          role_description: extracted.roleDescription,
+          hours_worked: extracted.hoursWorked,
+          hours_period: extracted.hoursPeriod,
+          hourly_rate: extracted.hourlyRate,
+          payer_id: null, // Will be updated after payer insert
+          payer_name: extracted.payerName,
+          payer_address: extracted.payerAddress,
+          payer_nature_of_business: extracted.payerNatureOfBusiness,
+          start_date: extracted.startDate,
+          end_date: extracted.endDate,
+          received_date: extracted.receivedDate,
+          is_donated: extracted.isDonated,
+        })
+      }
     }
 
     // Insert payers first

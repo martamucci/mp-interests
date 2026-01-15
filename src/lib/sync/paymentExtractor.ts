@@ -226,6 +226,233 @@ function calculateHourlyRate(
   return amount / hours
 }
 
+// Extract multiple payments from an interest (handles childInterests as separate payments)
+export function extractPaymentsFromInterest(interest: PublishedInterest): ExtractedPayment[] {
+  const payments: ExtractedPayment[] = []
+  const fields = interest.fields || []
+  const childInterests = interest.childInterests || []
+
+  // If there are childInterests, each one is a separate payment
+  if (childInterests.length > 0) {
+    // Extract shared info from parent interest (payer, role, etc.)
+    const parentPayerField = findField(fields, FIELD_MAPPINGS.payer)
+    const parentPayerName = getFieldValue(parentPayerField) as string | null
+
+    const parentRoleField = findField(fields, FIELD_MAPPINGS.role)
+    let parentRoleDescription = getFieldValue(parentRoleField) as string | null
+    if (!parentRoleDescription && interest.summary) {
+      parentRoleDescription = interest.summary
+    }
+
+    const parentAddressField = findField(fields, FIELD_MAPPINGS.address)
+    const parentPayerAddress = getFieldValue(parentAddressField) as string | null
+
+    const parentNatureField = findField(fields, FIELD_MAPPINGS.nature)
+    const parentPayerNatureOfBusiness = getFieldValue(parentNatureField) as string | null
+
+    const parentDonorStatusField = findField(fields, FIELD_MAPPINGS.donorStatus)
+    const parentPayerStatus = getFieldValue(parentDonorStatusField) as string | null
+
+    // Process each childInterest as a separate payment
+    for (const child of childInterests) {
+      const childFields = child.fields || []
+      if (childFields.length === 0) continue
+
+      // Extract payment-specific fields from child
+      const amountField = findField(childFields, FIELD_MAPPINGS.amount)
+      const amountRaw = getFieldValue(amountField)
+      const amount = parseCurrencyAmount(amountRaw)
+
+      // Skip if no amount
+      if (amount === null) continue
+
+      const hoursField = findField(childFields, FIELD_MAPPINGS.hours)
+      const hoursWorked = parseHours(getFieldValue(hoursField))
+
+      const hoursPeriodField = findField(childFields, FIELD_MAPPINGS.hoursPeriod)
+      const hoursPeriod = getFieldValue(hoursPeriodField) as string | null
+
+      const hourlyRate = calculateHourlyRate(amount, hoursWorked, hoursPeriod)
+
+      const regularityField = findField(childFields, FIELD_MAPPINGS.regularity)
+      const regularity = getFieldValue(regularityField) as string | null
+
+      const paymentTypeField = findField(childFields, FIELD_MAPPINGS.paymentType)
+      const paymentType = getFieldValue(paymentTypeField) as string | null
+
+      const startDateField = findField(childFields, FIELD_MAPPINGS.startDate)
+      const startDate = parseDateField(getFieldValue(startDateField))
+
+      const endDateField = findField(childFields, FIELD_MAPPINGS.endDate)
+      const endDate = parseDateField(getFieldValue(endDateField))
+
+      const receivedDateField = findField(childFields, FIELD_MAPPINGS.receivedDate)
+      const receivedDate = parseDateField(getFieldValue(receivedDateField))
+
+      // Child might have its own payer info, but usually inherits from parent
+      const childPayerField = findField(childFields, FIELD_MAPPINGS.payer)
+      const payerName = (getFieldValue(childPayerField) as string | null) || parentPayerName
+
+      // Child might have its own role description
+      const childRoleField = findField(childFields, FIELD_MAPPINGS.role)
+      const roleDescription = (getFieldValue(childRoleField) as string | null) || parentRoleDescription
+
+      const categoryName = interest.category?.name?.toLowerCase() || ''
+      const isDonated = categoryName.includes('donation') || categoryName.includes('gift')
+
+      payments.push({
+        interestId: interest.id,
+        memberId: interest.member.id,
+        categoryId: interest.category.id,
+        amount,
+        amountRaw: amountRaw?.toString() || null,
+        paymentType,
+        regularity,
+        roleDescription,
+        hoursWorked,
+        hoursPeriod,
+        hourlyRate,
+        payerName,
+        payerAddress: parentPayerAddress,
+        payerNatureOfBusiness: parentPayerNatureOfBusiness,
+        payerStatus: parentPayerStatus,
+        startDate,
+        endDate,
+        receivedDate,
+        isDonated,
+      })
+    }
+
+    // If we extracted payments from children, return them
+    if (payments.length > 0) {
+      return payments
+    }
+  }
+
+  // Fall back to extracting from parent interest directly (for interests without childInterests)
+  const singlePayment = extractSinglePaymentFromFields(interest, fields)
+  if (singlePayment) {
+    payments.push(singlePayment)
+  }
+
+  return payments
+}
+
+// Helper function to extract a single payment from fields (used for interests without childInterests)
+function extractSinglePaymentFromFields(interest: PublishedInterest, fields: InterestField[]): ExtractedPayment | null {
+  // Also check child interests for nested payment data (legacy behavior for non-child-interest cases)
+  const allFields = [...fields]
+
+  if (allFields.length === 0) {
+    return null
+  }
+
+  // First, try to extract from nested Donors/Payers arrays (common in Visits, Gifts, etc.)
+  const donorData = extractFromDonorsArray(allFields)
+
+  // Extract amount - try direct field first, then fall back to donor data
+  const amountField = findField(allFields, FIELD_MAPPINGS.amount)
+  let amountRaw = getFieldValue(amountField)
+  let amount = parseCurrencyAmount(amountRaw)
+
+  // If no direct amount found, use donor data
+  if (amount === null && donorData && donorData.value !== null) {
+    amount = donorData.value
+    amountRaw = donorData.valueRaw
+  }
+
+  // Extract payer info - try direct field first, then fall back to donor data
+  const payerField = findField(allFields, FIELD_MAPPINGS.payer)
+  let payerName = getFieldValue(payerField) as string | null
+  if (!payerName && donorData?.name) {
+    payerName = donorData.name
+  }
+
+  // Extract role/work description
+  const roleField = findField(allFields, FIELD_MAPPINGS.role)
+  let roleDescription = getFieldValue(roleField) as string | null
+
+  // Fallback to summary if no role found
+  if (!roleDescription && interest.summary) {
+    roleDescription = interest.summary
+  }
+
+  // Extract hours
+  const hoursField = findField(allFields, FIELD_MAPPINGS.hours)
+  const hoursWorked = parseHours(getFieldValue(hoursField))
+
+  const hoursPeriodField = findField(allFields, FIELD_MAPPINGS.hoursPeriod)
+  const hoursPeriod = getFieldValue(hoursPeriodField) as string | null
+
+  // Calculate hourly rate
+  const hourlyRate = calculateHourlyRate(amount, hoursWorked, hoursPeriod)
+
+  // Extract other fields - try direct field first, then fall back to donor data
+  const addressField = findField(allFields, FIELD_MAPPINGS.address)
+  let payerAddress = getFieldValue(addressField) as string | null
+  if (!payerAddress && donorData?.address) {
+    payerAddress = donorData.address
+  }
+
+  const natureField = findField(allFields, FIELD_MAPPINGS.nature)
+  const payerNatureOfBusiness = getFieldValue(natureField) as string | null
+
+  const regularityField = findField(allFields, FIELD_MAPPINGS.regularity)
+  const regularity = getFieldValue(regularityField) as string | null
+
+  const paymentTypeField = findField(allFields, FIELD_MAPPINGS.paymentType)
+  let paymentType = getFieldValue(paymentTypeField) as string | null
+  if (!paymentType && donorData?.paymentType) {
+    paymentType = donorData.paymentType
+  }
+
+  const startDateField = findField(allFields, FIELD_MAPPINGS.startDate)
+  const startDate = parseDateField(getFieldValue(startDateField))
+
+  const endDateField = findField(allFields, FIELD_MAPPINGS.endDate)
+  const endDate = parseDateField(getFieldValue(endDateField))
+
+  const receivedDateField = findField(allFields, FIELD_MAPPINGS.receivedDate)
+  const receivedDate = parseDateField(getFieldValue(receivedDateField))
+
+  // Extract donor status (Individual, Company, etc.) from API
+  const donorStatusField = findField(allFields, FIELD_MAPPINGS.donorStatus)
+  const payerStatus = getFieldValue(donorStatusField) as string | null
+
+  // Try to get payer name from DonorName field if not found
+  if (!payerName) {
+    const donorNameField = findField(allFields, FIELD_MAPPINGS.donorName)
+    payerName = getFieldValue(donorNameField) as string | null
+  }
+
+  // Determine if this is a donation
+  const categoryName = interest.category?.name?.toLowerCase() || ''
+  const isDonated = categoryName.includes('donation') || categoryName.includes('gift')
+
+  return {
+    interestId: interest.id,
+    memberId: interest.member.id,
+    categoryId: interest.category.id,
+    amount,
+    amountRaw: amountRaw?.toString() || null,
+    paymentType,
+    regularity,
+    roleDescription,
+    hoursWorked,
+    hoursPeriod,
+    hourlyRate,
+    payerName,
+    payerAddress,
+    payerNatureOfBusiness,
+    payerStatus,
+    startDate,
+    endDate,
+    receivedDate,
+    isDonated,
+  }
+}
+
+// Legacy function for backward compatibility
 export function extractPaymentFromInterest(interest: PublishedInterest): ExtractedPayment | null {
   const fields = interest.fields || []
 
@@ -348,10 +575,8 @@ export function extractAllPayments(interests: PublishedInterest[]): ExtractedPay
   const payments: ExtractedPayment[] = []
 
   for (const interest of interests) {
-    const payment = extractPaymentFromInterest(interest)
-    if (payment) {
-      payments.push(payment)
-    }
+    const extractedPayments = extractPaymentsFromInterest(interest)
+    payments.push(...extractedPayments)
   }
 
   return payments
