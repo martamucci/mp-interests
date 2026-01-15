@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAPIClient } from '@/lib/supabase/server'
 import type { DashboardSummaryResponse } from '@/types/api'
-import type { TopEarner } from '@/types/database'
+import type { TopEarner, PartyTotal } from '@/types/database'
 
 // The 10 interest categories
 const INTEREST_CATEGORIES = [
@@ -25,16 +25,21 @@ export async function GET() {
 
     // Fetch all data in parallel
     const [
-      partyTotalsResult,
+      membersWithPaymentsResult,
       payersWithPaymentsResult,
       categoriesResult,
-      partiesResult,
       lastSyncResult,
-      // Fetch top earners aggregated by member (not by role)
-      topEarnersResult,
     ] = await Promise.all([
-      supabase.from('mv_party_totals').select('*').order('total_amount', { ascending: false }),
-      // Use live data from payers table instead of stale materialized view
+      // Fetch members with their payments for party totals and top earners
+      supabase.from('members').select(`
+        id,
+        name_display,
+        party_name,
+        party_color,
+        constituency,
+        payments(amount)
+      `).eq('is_current', true),
+      // Use live data from payers table
       supabase.from('payers').select(`
         id,
         name,
@@ -43,11 +48,87 @@ export async function GET() {
         payments(amount, member_id)
       `),
       supabase.from('categories').select('id, name'),
-      supabase.from('members').select('party_name').eq('is_current', true),
       supabase.from('sync_log').select('completed_at').eq('status', 'completed').order('completed_at', { ascending: false }).limit(1),
-      // Get top earners aggregated by member with total amounts
-      supabase.rpc('get_top_earners_by_member', { limit_count: 100 }),
     ])
+
+    // Calculate party totals from live data
+    const partyMap = new Map<string, {
+      party_name: string
+      party_color: string | null
+      mp_count: number
+      total_amount: number
+      payment_count: number
+    }>()
+
+    // Calculate top earners from live data
+    const earnersList: Array<{
+      member_id: number
+      name_display: string
+      party_name: string
+      constituency: string | null
+      total_amount: number
+      payment_count: number
+    }> = []
+
+    for (const member of membersWithPaymentsResult.data || []) {
+      let memberTotal = 0
+      let memberPaymentCount = 0
+
+      for (const payment of member.payments || []) {
+        if (payment.amount) {
+          memberTotal += payment.amount
+          memberPaymentCount++
+        }
+      }
+
+      // Add to earners list
+      earnersList.push({
+        member_id: member.id,
+        name_display: member.name_display,
+        party_name: member.party_name,
+        constituency: member.constituency,
+        total_amount: memberTotal,
+        payment_count: memberPaymentCount,
+      })
+
+      // Aggregate by party
+      const partyName = member.party_name
+      if (!partyMap.has(partyName)) {
+        partyMap.set(partyName, {
+          party_name: partyName,
+          party_color: member.party_color,
+          mp_count: 0,
+          total_amount: 0,
+          payment_count: 0,
+        })
+      }
+      const partyEntry = partyMap.get(partyName)!
+      partyEntry.mp_count += 1
+      partyEntry.total_amount += memberTotal
+      partyEntry.payment_count += memberPaymentCount
+    }
+
+    // Convert party map to sorted array
+    const partyTotals: PartyTotal[] = Array.from(partyMap.values())
+      .sort((a, b) => b.total_amount - a.total_amount)
+
+    // Sort earners by total amount and get top 100
+    const sortedEarners = earnersList
+      .filter(e => e.total_amount > 0)
+      .sort((a, b) => b.total_amount - a.total_amount)
+      .slice(0, 100)
+
+    // Convert to TopEarner format
+    const allEarners: TopEarner[] = sortedEarners.map(e => ({
+      member_id: e.member_id,
+      name_display: e.name_display,
+      party_name: e.party_name,
+      constituency: e.constituency,
+      category_id: null,
+      category_name: null,
+      total_amount: e.total_amount,
+      payment_count: e.payment_count,
+    }))
 
     // Aggregate payer data from live query
     const payerMap = new Map<number, {
@@ -85,44 +166,38 @@ export async function GET() {
     }
 
     // Convert to array with proper mp_count
-    const topPayersResult = {
-      data: Array.from(payerMap.values())
-        .map(p => ({
-          ...p,
-          mp_count: p.mp_count.size
-        }))
-        .filter(p => p.total_paid > 0)
-        .sort((a, b) => b.total_paid - a.total_paid)
-    }
+    const allPayers = Array.from(payerMap.values())
+      .map(p => ({
+        ...p,
+        mp_count: p.mp_count.size
+      }))
+      .filter(p => p.total_paid > 0)
+      .sort((a, b) => b.total_paid - a.total_paid)
 
     // Extract unique parties
-    const parties = [...new Set(partiesResult.data?.map(p => p.party_name))] as string[]
+    const parties = [...new Set(partyTotals.map(p => p.party_name))]
 
     // Get category names from database or use defaults
     const categoryNames = categoriesResult.data?.map(c => c.name) || INTEREST_CATEGORIES
 
-    // Process top earners data
-    const allEarners: TopEarner[] = topEarnersResult.data || []
-
-    // Get top 5 overall earners (for category section - no filter applied)
+    // Get top 5 overall earners
     const topEarnersByCategory = allEarners.slice(0, 5)
-
-    // Get top 5 overall earners by party (aggregate all payments per member)
     const topEarnersByParty = allEarners.slice(0, 5)
 
     // Split payers by type
-    const allPayers = topPayersResult.data || []
     const governments = allPayers.filter(p => p.payer_type === 'Government').slice(0, 5)
     const companies = allPayers.filter(p => p.payer_type === 'Company').slice(0, 5)
     const individuals = allPayers.filter(p => p.payer_type === 'Individual').slice(0, 5)
 
     // Get latest payment date for each top payer
     const topPayerIds = [...governments, ...companies, ...individuals].map(p => p.payer_id)
-    const { data: payerDates } = await supabase
-      .from('payments')
-      .select('payer_id, received_date, start_date, interest_id')
-      .in('payer_id', topPayerIds)
-      .not('amount', 'is', null)
+    const { data: payerDates } = topPayerIds.length > 0
+      ? await supabase
+          .from('payments')
+          .select('payer_id, received_date, start_date, interest_id')
+          .in('payer_id', topPayerIds)
+          .not('amount', 'is', null)
+      : { data: [] }
 
     // Get interest_ids for payments without dates to check raw_fields
     const interestIdsWithoutDate = (payerDates || [])
@@ -145,7 +220,6 @@ export async function GET() {
         for (const field of rawFields) {
           const fieldName = field.name?.toLowerCase() || ''
           if ((fieldName.includes('date') || fieldName === 'from' || fieldName === 'start') && field.value) {
-            // Try to parse the date
             const parsed = new Date(field.value)
             if (!isNaN(parsed.getTime())) {
               interestDateMap.set(interest.id, parsed.toISOString().split('T')[0])
@@ -160,7 +234,6 @@ export async function GET() {
     const payerDateMap = new Map<number, string | null>()
     for (const payment of payerDates || []) {
       let date = payment.received_date || payment.start_date
-      // Fall back to date from raw_fields
       if (!date && payment.interest_id) {
         date = interestDateMap.get(payment.interest_id) || null
       }
@@ -180,7 +253,7 @@ export async function GET() {
       }))
 
     const response: DashboardSummaryResponse = {
-      partyTotals: partyTotalsResult.data || [],
+      partyTotals,
       topEarnersByCategory,
       topEarnersByParty,
       topPayers: {
