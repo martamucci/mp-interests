@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAPIClient } from '@/lib/supabase/server'
 import type { MPDetailResponse } from '@/types/api'
 
-export const revalidate = 3600
+export const revalidate = 0 // Disable caching for fresh data
 
 // Extract fields from raw_fields array
 function extractFromRawFields(
@@ -65,7 +65,27 @@ export async function GET(
       )
     }
 
-    // Fetch interests with payments
+    // Fetch ALL payments for this member directly (not through interests)
+    // This ensures we get all payments including multiple per interest
+    const { data: payments } = await supabase
+      .from('payments')
+      .select(`
+        id,
+        amount,
+        payer_name,
+        role_description,
+        hours_worked,
+        hourly_rate,
+        start_date,
+        received_date,
+        interest_id,
+        category_id
+      `)
+      .eq('member_id', memberId)
+      .order('amount', { ascending: false, nullsFirst: false })
+      .limit(1000)
+
+    // Fetch interests for additional fields (summary, raw_fields)
     const { data: interests } = await supabase
       .from('interests')
       .select(`
@@ -73,36 +93,40 @@ export async function GET(
         summary,
         registration_date,
         raw_fields,
-        category:categories(id, name),
-        payments(
-          amount,
-          payer_name,
-          role_description,
-          hours_worked,
-          hourly_rate,
-          start_date,
-          received_date
-        )
+        category:categories(id, name)
       `)
       .eq('member_id', memberId)
-      .order('registration_date', { ascending: false })
 
-    // Calculate summary stats
+    // Create maps for quick lookup
+    const interestMap = new Map(
+      (interests || []).map(i => [i.id, i])
+    )
+
+    // Get unique category IDs and fetch category names
+    const categoryIds = [...new Set((payments || []).map(p => p.category_id).filter(Boolean))]
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('id, name')
+      .in('id', categoryIds)
+
+    const categoryNameMap = new Map(
+      (categories || []).map(c => [c.id, c.name])
+    )
+
+    // Calculate summary stats from ALL payments
     let totalAmount = 0
     const categoryMap = new Map<number, { name: string; amount: number; count: number }>()
 
-    const interestsWithPayments = (interests || []).map(interest => {
-      const payment = interest.payments?.[0] || {} as Record<string, unknown>
-      const amount = (payment.amount as number) || 0
+    // Process each payment as a separate entry
+    const paymentEntries = (payments || []).map(payment => {
+      const amount = payment.amount || 0
       totalAmount += amount
 
-      // Aggregate by category - Supabase returns single object or array
-      const categoryData = Array.isArray(interest.category)
-        ? interest.category[0]
-        : interest.category
-      const categoryId = (categoryData as { id: number; name: string } | null)?.id
-      const categoryName = (categoryData as { id: number; name: string } | null)?.name || 'Unknown'
+      const interest = interestMap.get(payment.interest_id)
+      const categoryId = payment.category_id
+      const categoryName = categoryNameMap.get(categoryId) || 'Unknown'
 
+      // Aggregate by category
       if (categoryId) {
         const existing = categoryMap.get(categoryId) || { name: categoryName, amount: 0, count: 0 }
         existing.amount += amount
@@ -110,28 +134,27 @@ export async function GET(
         categoryMap.set(categoryId, existing)
       }
 
-      // Extract additional fields from raw_fields
-      const rawFields = interest.raw_fields as Array<{ name?: string; value?: string }> | null
+      // Extract additional fields from interest's raw_fields
+      const rawFields = interest?.raw_fields as Array<{ name?: string; value?: string }> | null
       const destination = extractFromRawFields(rawFields, ['destination', 'country', 'location'])
       const purpose = extractFromRawFields(rawFields, ['purpose'])
       const donationDescription = extractFromRawFields(rawFields, ['description of donation', 'description'])
 
       // Get date from payment or raw_fields
-      const date = (payment.received_date as string) ||
-        (payment.start_date as string) ||
-        extractDate(rawFields)
+      const date = payment.received_date || payment.start_date || extractDate(rawFields)
 
       return {
-        id: interest.id,
+        id: payment.interest_id,
+        paymentId: payment.id,
         category: categoryName,
         categoryId: categoryId,
-        summary: interest.summary,
-        amount: payment.amount as number | null,
-        payerName: payment.payer_name as string | null,
-        roleDescription: payment.role_description as string | null,
-        registrationDate: interest.registration_date,
-        hoursWorked: payment.hours_worked as number | null,
-        hourlyRate: payment.hourly_rate as number | null,
+        summary: interest?.summary || null,
+        amount: payment.amount,
+        payerName: payment.payer_name,
+        roleDescription: payment.role_description,
+        registrationDate: interest?.registration_date || null,
+        hoursWorked: payment.hours_worked,
+        hourlyRate: payment.hourly_rate,
         date,
         destination,
         purpose,
@@ -159,10 +182,10 @@ export async function GET(
       },
       summary: {
         totalAmount,
-        interestCount: interestsWithPayments.length,
+        interestCount: paymentEntries.length,
         categoryBreakdown,
       },
-      interests: interestsWithPayments,
+      interests: paymentEntries,
     }
 
     return NextResponse.json(response)
