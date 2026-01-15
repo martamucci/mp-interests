@@ -72,11 +72,20 @@ export default function InterestsList({ interests }: InterestsListProps) {
       ),
     },
     {
-      key: 'date',
-      header: 'Date',
+      key: 'dateReceived',
+      header: 'Date Received',
       render: (item: MPInterest) => (
-        <span className="text-sm text-dark-grey">
-          {formatDate(item.date) || formatDate(item.registrationDate) || '—'}
+        <span className="text-sm text-dark-grey whitespace-nowrap">
+          {formatDate(item.date) || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'dateRegistered',
+      header: 'Date Registered',
+      render: (item: MPInterest) => (
+        <span className="text-sm text-dark-grey whitespace-nowrap">
+          {formatDate(item.registrationDate) || '—'}
         </span>
       ),
     },

@@ -50,11 +50,20 @@ export default function LatestInterestsPage() {
 
   const columns = [
     {
-      key: 'date',
-      header: 'Date',
+      key: 'dateReceived',
+      header: 'Date Received',
       render: (item: LatestInterest) => (
         <span className="text-sm text-dark-grey whitespace-nowrap">
-          {formatDate(item.date) || formatDate(item.registrationDate) || '—'}
+          {formatDate(item.date) || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'dateRegistered',
+      header: 'Date Registered',
+      render: (item: LatestInterest) => (
+        <span className="text-sm text-dark-grey whitespace-nowrap">
+          {formatDate(item.registrationDate) || '—'}
         </span>
       ),
     },
