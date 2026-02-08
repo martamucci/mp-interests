@@ -84,7 +84,7 @@ export async function GET(_request: NextRequest, context: { params: { party: str
         .range(offset, offset + limit - 1)
 
       if (error) throw error
-      payments.push(...(chunk || []))
+      payments.push(...((chunk || []) as typeof payments))
       if (!chunk || chunk.length < limit) break
       offset += limit
     }
