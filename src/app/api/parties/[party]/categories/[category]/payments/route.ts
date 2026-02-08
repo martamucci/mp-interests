@@ -55,8 +55,8 @@ export async function GET(_request: NextRequest, context: { params: { party: str
       hourly_rate: number | null
       start_date: string | null
       received_date: string | null
-      member: { id: number; name_display: string; party_name: string; constituency: string | null } | null
-      interest: { summary: string | null; raw_fields: unknown; registration_date: string | null } | null
+      member: { id: number; name_display: string; party_name: string; constituency: string | null } | Array<{ id: number; name_display: string; party_name: string; constituency: string | null }> | null
+      interest: { summary: string | null; raw_fields: unknown; registration_date: string | null } | Array<{ summary: string | null; raw_fields: unknown; registration_date: string | null }> | null
     }> = []
 
     const limit = 1000
@@ -90,8 +90,10 @@ export async function GET(_request: NextRequest, context: { params: { party: str
     }
 
     const enrichedPayments = (payments || []).map(payment => {
-      const rawFields = payment.interest?.raw_fields as Array<{ name?: string; value?: string }> | null
-      const date = payment.received_date || payment.start_date || payment.interest?.registration_date || null
+      const member = Array.isArray(payment.member) ? payment.member[0] : payment.member
+      const interest = Array.isArray(payment.interest) ? payment.interest[0] : payment.interest
+      const rawFields = interest?.raw_fields as Array<{ name?: string; value?: string }> | null
+      const date = payment.received_date || payment.start_date || interest?.registration_date || null
       return {
         id: payment.id,
         amount: payment.amount,
@@ -100,11 +102,11 @@ export async function GET(_request: NextRequest, context: { params: { party: str
         hoursWorked: payment.hours_worked,
         hourlyRate: payment.hourly_rate,
         date,
-        summary: payment.interest?.summary || null,
+        summary: interest?.summary || null,
         purpose: extractFromRawFields(rawFields, ['purpose']),
         destination: extractFromRawFields(rawFields, ['destination', 'country', 'location']),
         donationDescription: extractFromRawFields(rawFields, ['description of donation', 'description']),
-        member: payment.member,
+        member,
       }
     })
 
