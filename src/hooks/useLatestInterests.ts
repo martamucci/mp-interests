@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 export interface LatestInterest {
   id: number
+  paymentId?: number | null
   category: string
   categoryId?: number
   summary: string | null

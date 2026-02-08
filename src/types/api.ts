@@ -113,10 +113,39 @@ export interface SearchResult {
   relevanceScore: number
 }
 
+export interface SearchQuery {
+  intent: 'find_mp' | 'find_interest' | 'find_payer' | 'aggregate' | 'compare' | 'general'
+  entities: {
+    mpNames?: string[]
+    parties?: string[]
+    categories?: string[]
+    payerNames?: string[]
+    payerTypes?: string[]
+    amounts?: { min?: number; max?: number }
+    dateRange?: { from?: string; to?: string }
+  }
+  aggregation?: {
+    type: 'sum' | 'count' | 'average' | 'max' | 'top'
+    groupBy?: string
+  }
+  limit?: number
+}
+
+export interface SearchStats {
+  totalCount: number
+  totalAmount: number
+  mpCount: number
+}
+
 export interface SearchResponse {
   interpretation: string
+  query: SearchQuery
+  summary: string
   results: SearchResult[]
+  stats: SearchStats
+  aggregateSummary?: string
   suggestions?: string[]
+  relevance?: 'relevant' | 'irrelevant'
 }
 
 // Error response

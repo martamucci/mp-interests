@@ -5,10 +5,13 @@ import DashboardHero from '@/components/dashboard/DashboardHero'
 import TopEarnersCard from '@/components/dashboard/TopEarnersCard'
 import TopPayersTable from '@/components/dashboard/TopPayersTable'
 import SearchWidget from '@/components/dashboard/SearchWidget'
-import { useDashboardData, useTopEarners } from '@/hooks/useDashboardData'
+import { useDashboardData, useTopEarners, useTopPayersByType } from '@/hooks/useDashboardData'
 
 export default function DashboardPage() {
   const { data, isLoading, error } = useDashboardData()
+  const { data: topGovernmentPayers, isLoading: topGovernmentLoading } = useTopPayersByType('Government')
+  const { data: topCompanyPayers, isLoading: topCompanyLoading } = useTopPayersByType('Company')
+  const { data: topIndividualPayers, isLoading: topIndividualLoading } = useTopPayersByType('Individual')
 
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -61,19 +64,19 @@ export default function DashboardPage() {
       {/* Top Payers Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <TopPayersTable
-          data={data?.topPayers.governments || []}
+          data={topGovernmentPayers.length > 0 ? topGovernmentPayers : (data?.topPayers.governments || [])}
           payerType="Government"
-          isLoading={isLoading}
+          isLoading={isLoading || topGovernmentLoading}
         />
         <TopPayersTable
-          data={data?.topPayers.companies || []}
+          data={topCompanyPayers.length > 0 ? topCompanyPayers : (data?.topPayers.companies || [])}
           payerType="Company"
-          isLoading={isLoading}
+          isLoading={isLoading || topCompanyLoading}
         />
         <TopPayersTable
-          data={data?.topPayers.individuals || []}
+          data={topIndividualPayers.length > 0 ? topIndividualPayers : (data?.topPayers.individuals || [])}
           payerType="Individual"
-          isLoading={isLoading}
+          isLoading={isLoading || topIndividualLoading}
         />
       </div>
 

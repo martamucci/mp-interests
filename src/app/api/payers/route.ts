@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || 'high' // 'high' or 'low'
     const subtype = searchParams.get('subtype') || ''
 
-    const supabase = createAPIClient()
+    const supabase = createAPIClient(true)
 
     // Query payers with their payments for live data
     let query = supabase
@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
         name,
         payer_type,
         payer_subtype,
-        payments!inner(amount, member_id)
+        payments(amount, member_id)
       `)
+      .order('id')
+      .limit(10000)
 
     if (payerType) {
       query = query.eq('payer_type', payerType)
@@ -74,6 +76,35 @@ export async function GET(request: NextRequest) {
           if (payment.member_id) {
             entry.mp_count.add(payment.member_id)
           }
+        }
+      }
+    }
+
+    const payerNameToId = new Map<string, number>()
+    for (const payer of rawPayers || []) {
+      if (payer.name) {
+        payerNameToId.set(payer.name.toLowerCase(), payer.id)
+      }
+    }
+
+    const { data: unlinkedPayments } = await supabase
+      .from('payments')
+      .select('payer_name, amount, member_id')
+      .is('payer_id', null)
+      .not('payer_name', 'is', null)
+
+    for (const payment of unlinkedPayments || []) {
+      const nameKey = payment.payer_name?.toLowerCase()
+      if (!nameKey) continue
+      const payerId = payerNameToId.get(nameKey)
+      if (!payerId) continue
+      const entry = payerMap.get(payerId)
+      if (!entry) continue
+      if (payment.amount) {
+        entry.total_paid += payment.amount
+        entry.payment_count++
+        if (payment.member_id) {
+          entry.mp_count.add(payment.member_id)
         }
       }
     }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Modal from '@/components/ui/Modal'
 import Badge from '@/components/ui/Badge'
 import { formatCurrency } from '@/lib/utils/currency'
+import { formatDate } from '@/lib/utils/dates'
 import { getPartyColor } from '@/lib/theme'
 
 interface PaymentDetail {
@@ -99,74 +100,57 @@ export default function PayerPaymentsModal({
           {/* Payments list */}
           <div className="space-y-3">
             {data.payments.map((payment) => (
-              <div
-                key={payment.id}
-                className="p-4 rounded-lg border border-rose-quartz/20 hover:border-rose-quartz/40 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    {/* MP Name */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-near-black truncate">
-                        {payment.member?.name_display || 'Unknown MP'}
-                      </span>
-                      {payment.member?.party_name && (
-                        <Badge color={getPartyColor(payment.member.party_name)} size="sm">
-                          {payment.member.party_name}
-                        </Badge>
+                <div
+                  key={payment.id}
+                  className="p-3 rounded-lg border border-rose-quartz/20"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-near-black truncate">
+                          {payment.member?.name_display || 'Unknown MP'}
+                        </span>
+                        {payment.member?.party_name && (
+                          <Badge color={getPartyColor(payment.member.party_name)} size="sm">
+                            {payment.member.party_name}
+                          </Badge>
+                        )}
+                      </div>
+                      {payment.member?.constituency && (
+                        <div className="text-xs text-dark-grey mb-2">
+                          {payment.member.constituency}
+                        </div>
+                      )}
+                      {payment.category?.name && (
+                        <div className="text-sm text-dark-grey">
+                          <span className="inline-block px-2 py-0.5 bg-lavender/50 rounded text-xs">
+                            {payment.category.name}
+                          </span>
+                        </div>
+                      )}
+                      {payment.purpose && (
+                        <div className="text-sm mt-2">
+                          <span className="text-dark-grey">Purpose: </span>
+                          <span className="text-near-black">{payment.purpose}</span>
+                        </div>
+                      )}
+                      {payment.role_description && !payment.purpose && (
+                        <div className="text-sm text-dark-grey mt-2 line-clamp-2">
+                          {payment.role_description}
+                        </div>
                       )}
                     </div>
-
-                    {/* Constituency */}
-                    {payment.member?.constituency && (
-                      <div className="text-xs text-dark-grey mb-2">
-                        {payment.member.constituency}
+                    <div className="text-right shrink-0">
+                      <div className="font-semibold text-near-black">
+                        {formatCurrency(payment.amount || 0)}
                       </div>
-                    )}
-
-                    {/* Category */}
-                    {payment.category?.name && (
-                      <div className="text-sm text-dark-grey">
-                        <span className="inline-block px-2 py-0.5 bg-lavender/50 rounded text-xs">
-                          {payment.category.name}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Purpose of visit */}
-                    {payment.purpose && (
-                      <div className="text-sm mt-2">
-                        <span className="text-dark-grey">Purpose: </span>
-                        <span className="text-near-black">{payment.purpose}</span>
-                      </div>
-                    )}
-
-                    {/* Role/Description */}
-                    {payment.role_description && !payment.purpose && (
-                      <div className="text-sm text-dark-grey mt-2 line-clamp-2">
-                        {payment.role_description}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Amount */}
-                  <div className="text-right shrink-0">
-                    <div className="font-semibold text-near-black">
-                      {formatCurrency(payment.amount || 0)}
-                    </div>
-                    {payment.date && (
                       <div className="text-xs text-dark-grey mt-1">
-                        {new Date(payment.date).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {formatDate(payment.date) || '—'}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
 
           {data.payments.length === 0 && (

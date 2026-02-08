@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Table from '@/components/ui/Table'
 import Card from '@/components/ui/Card'
@@ -9,6 +9,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate } from '@/lib/utils/dates'
 import { useLatestInterests, type LatestInterest } from '@/hooks/useLatestInterests'
+import InterestDetailsModal from '@/components/dashboard/InterestDetailsModal'
 
 // Check if category is employment related
 function isEmploymentCategory(category: string): boolean {
@@ -29,8 +30,29 @@ function isDonationOrGiftCategory(category: string): boolean {
 }
 
 export default function LatestInterestsPage() {
-  const [page, setPage] = useState(1)
-  const [party, setParty] = useState('')
+  const [page, setPage] = useState(() => {
+    if (typeof window === 'undefined') return 1
+    try {
+      const stored = sessionStorage.getItem('latest:state')
+      if (!stored) return 1
+      const parsed = JSON.parse(stored) as { page?: number }
+      return parsed.page ?? 1
+    } catch {
+      return 1
+    }
+  })
+  const [party, setParty] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const stored = sessionStorage.getItem('latest:state')
+      if (!stored) return ''
+      const parsed = JSON.parse(stored) as { party?: string }
+      return parsed.party ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const [selectedInterestId, setSelectedInterestId] = useState<number | null>(null)
 
   const { data, isLoading, error } = useLatestInterests({ page, limit: 50, party })
 
@@ -38,6 +60,34 @@ export default function LatestInterestsPage() {
     setParty(value)
     setPage(1) // Reset to first page when filter changes
   }
+
+  const scrollKey = useMemo(() => `latest:scroll:${page}:${party || 'all'}`, [page, party])
+  const hasRestoredScroll = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem('latest:state', JSON.stringify({ page, party }))
+  }, [page, party])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = sessionStorage.getItem(scrollKey)
+    if (!saved || hasRestoredScroll.current) return
+    if (isLoading) return
+    const y = Number(saved)
+    if (Number.isFinite(y)) {
+      window.scrollTo(0, y)
+      hasRestoredScroll.current = true
+    }
+  }, [scrollKey, isLoading])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const save = () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY))
+    }
+    return () => save()
+  }, [scrollKey])
 
   if (error) {
     return (
@@ -50,15 +100,6 @@ export default function LatestInterestsPage() {
 
   const columns = [
     {
-      key: 'dateReceived',
-      header: 'Date Received',
-      render: (item: LatestInterest) => (
-        <span className="text-sm text-dark-grey whitespace-nowrap">
-          {formatDate(item.date) || '—'}
-        </span>
-      ),
-    },
-    {
       key: 'dateRegistered',
       header: 'Date Registered',
       render: (item: LatestInterest) => (
@@ -68,12 +109,23 @@ export default function LatestInterestsPage() {
       ),
     },
     {
+      key: 'dateReceived',
+      header: 'Date Received',
+      render: (item: LatestInterest) => (
+        <span className="text-sm text-dark-grey whitespace-nowrap">
+          {formatDate(item.date) || '—'}
+        </span>
+      ),
+    },
+    {
       key: 'member',
       header: 'MP',
+      className: 'min-w-[260px]',
       render: (item: LatestInterest) => (
         <Link
           href={`/mps/${item.member.id}?from=latest`}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          onClick={(event) => event.stopPropagation()}
         >
           {item.member.thumbnailUrl ? (
             <img
@@ -107,6 +159,7 @@ export default function LatestInterestsPage() {
     {
       key: 'category',
       header: 'Category',
+      className: 'min-w-[200px]',
       render: (item: LatestInterest) => (
         <span className="inline-block px-2 py-0.5 bg-lavender/50 rounded text-sm">
           {item.category}
@@ -147,8 +200,9 @@ export default function LatestInterestsPage() {
     {
       key: 'details',
       header: 'Details',
+      className: 'w-[320px]',
       render: (item: LatestInterest) => (
-        <div className="max-w-sm text-sm">
+        <div className="text-sm line-clamp-3">
           {isVisitsCategory(item.category) && (
             <>
               {item.destination && (
@@ -164,17 +218,17 @@ export default function LatestInterestsPage() {
                 </div>
               )}
               {!item.destination && !item.purpose && item.summary && (
-                <span className="text-dark-grey line-clamp-2">{item.summary}</span>
+                <span className="text-dark-grey">{item.summary}</span>
               )}
             </>
           )}
           {isDonationOrGiftCategory(item.category) && (
             <>
               {item.donationDescription && (
-                <span className="text-dark-grey line-clamp-2">{item.donationDescription}</span>
+                <span className="text-dark-grey">{item.donationDescription}</span>
               )}
               {!item.donationDescription && item.summary && (
-                <span className="text-dark-grey line-clamp-2">{item.summary}</span>
+                <span className="text-dark-grey">{item.summary}</span>
               )}
               {!item.donationDescription && !item.summary && (
                 <span className="text-dark-grey">—</span>
@@ -182,7 +236,7 @@ export default function LatestInterestsPage() {
             </>
           )}
           {!isVisitsCategory(item.category) && !isDonationOrGiftCategory(item.category) && (
-            <span className="text-dark-grey line-clamp-2">
+            <span className="text-dark-grey">
               {item.summary || '—'}
             </span>
           )}
@@ -241,6 +295,10 @@ export default function LatestInterestsPage() {
             data={data?.data || []}
             columns={columns}
             emptyMessage="No interests registered in the past month."
+            onRowClick={(item) => {
+              setSelectedInterestId(item.id)
+            }}
+            rowClassName="hover:bg-lavender/50 cursor-pointer"
           />
         )}
       </Card>
@@ -267,6 +325,11 @@ export default function LatestInterestsPage() {
           </button>
         </div>
       )}
+
+      <InterestDetailsModal
+        interestId={selectedInterestId}
+        onClose={() => setSelectedInterestId(null)}
+      />
     </div>
   )
 }

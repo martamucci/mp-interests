@@ -4,6 +4,8 @@ import Table from '@/components/ui/Table'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate } from '@/lib/utils/dates'
 import type { MPInterest } from '@/types/api'
+import InterestDetailsModal from '@/components/dashboard/InterestDetailsModal'
+import { useState } from 'react'
 
 interface InterestsListProps {
   interests: MPInterest[]
@@ -28,6 +30,8 @@ function isDonationOrGiftCategory(category: string): boolean {
 }
 
 export default function InterestsList({ interests }: InterestsListProps) {
+  const [selectedInterestId, setSelectedInterestId] = useState<number | null>(null)
+
   const columns = [
     {
       key: 'category',
@@ -140,10 +144,18 @@ export default function InterestsList({ interests }: InterestsListProps) {
   ]
 
   return (
-    <Table
-      data={interests}
-      columns={columns}
-      emptyMessage="No registered interests found."
-    />
+    <>
+      <Table
+        data={interests}
+        columns={columns}
+        emptyMessage="No registered interests found."
+        onRowClick={(item) => setSelectedInterestId(item.id)}
+        rowClassName="table-row-clickable"
+      />
+      <InterestDetailsModal
+        interestId={selectedInterestId}
+        onClose={() => setSelectedInterestId(null)}
+      />
+    </>
   )
 }

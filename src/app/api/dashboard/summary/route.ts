@@ -21,7 +21,7 @@ export const revalidate = 0 // Disable caching to ensure fresh data
 
 export async function GET() {
   try {
-    const supabase = createAPIClient()
+    const supabase = createAPIClient(true)
 
     // Fetch all data in parallel
     const [
@@ -46,7 +46,7 @@ export async function GET() {
         payer_type,
         payer_subtype,
         payments(amount, member_id)
-      `),
+      `).order('id').limit(10000),
       supabase.from('categories').select('id, name'),
       supabase.from('sync_log').select('completed_at').eq('status', 'completed').order('completed_at', { ascending: false }).limit(1),
     ])
@@ -169,6 +169,35 @@ export async function GET() {
       }
     }
 
+    const payerNameToId = new Map<string, number>()
+    for (const payer of payersWithPaymentsResult.data || []) {
+      if (payer.name) {
+        payerNameToId.set(payer.name.toLowerCase(), payer.id)
+      }
+    }
+
+    const { data: unlinkedPayments } = await supabase
+      .from('payments')
+      .select('payer_name, amount, member_id')
+      .is('payer_id', null)
+      .not('payer_name', 'is', null)
+
+    for (const payment of unlinkedPayments || []) {
+      const nameKey = payment.payer_name?.toLowerCase()
+      if (!nameKey) continue
+      const payerId = payerNameToId.get(nameKey)
+      if (!payerId) continue
+      const entry = payerMap.get(payerId)
+      if (!entry) continue
+      if (payment.amount) {
+        entry.total_paid += payment.amount
+        entry.payment_count++
+        if (payment.member_id) {
+          entry.mp_count.add(payment.member_id)
+        }
+      }
+    }
+
     // Convert to array with proper mp_count and typed payer_type
     const allPayers = Array.from(payerMap.values())
       .map(p => ({
@@ -189,10 +218,16 @@ export async function GET() {
     const topEarnersByCategory = allEarners.slice(0, 5)
     const topEarnersByParty = allEarners.slice(0, 5)
 
-    // Split payers by type
-    const governments = allPayers.filter(p => p.payer_type === 'Government').slice(0, 5)
-    const companies = allPayers.filter(p => p.payer_type === 'Company').slice(0, 5)
-    const individuals = allPayers.filter(p => p.payer_type === 'Individual').slice(0, 5)
+    const getTopPayersByType = (payerType: PayerType) =>
+      allPayers
+        .filter(p => p.payer_type === payerType)
+        .sort((a, b) => b.total_paid - a.total_paid)
+        .slice(0, 5)
+
+    // Split payers by type using the same high-to-low order as the list pages
+    const governments = getTopPayersByType('Government')
+    const companies = getTopPayersByType('Company')
+    const individuals = getTopPayersByType('Individual')
 
     // Get latest payment date for each top payer
     const topPayerIds = [...governments, ...companies, ...individuals].map(p => p.payer_id)

@@ -1,6 +1,6 @@
 'use client'
 
-import { use } from 'react'
+import { use, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Card from '@/components/ui/Card'
@@ -8,6 +8,7 @@ import MPProfile from '@/components/mps/MPProfile'
 import InterestBreakdown from '@/components/mps/InterestBreakdown'
 import InterestsList from '@/components/mps/InterestsList'
 import Skeleton from '@/components/ui/Skeleton'
+import Select from '@/components/ui/Select'
 import { useMPDetail } from '@/hooks/useMPDetail'
 
 export default function MPDetailPage({ params }: { params: { id: string } | Promise<{ id: string }> }) {
@@ -30,6 +31,22 @@ export default function MPDetailPage({ params }: { params: { id: string } | Prom
   const { link: backLink, label: backLabel } = getBackInfo()
 
   const { data, isLoading, error } = useMPDetail(id)
+  const [categoryFilter, setCategoryFilter] = useState('')
+
+  const categoryOptions = useMemo(() => {
+    if (!data) return []
+    const categories = Array.from(new Set(data.interests.map(interest => interest.category)))
+      .filter(Boolean)
+      .sort()
+    return categories.map(category => ({ value: category, label: category }))
+  }, [data])
+
+  const filteredInterests = useMemo(() => {
+    if (!data) return []
+    return categoryFilter
+      ? data.interests.filter(interest => interest.category === categoryFilter)
+      : data.interests
+  }, [data, categoryFilter])
 
   if (error) {
     return (
@@ -88,7 +105,24 @@ export default function MPDetailPage({ params }: { params: { id: string } | Prom
 
       {/* Interests List */}
       <Card title="Registered Interests">
-        <InterestsList interests={data.interests} />
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <Select
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            options={categoryOptions}
+            placeholder="All categories"
+            className="min-w-[220px]"
+          />
+          {categoryFilter && (
+            <button
+              onClick={() => setCategoryFilter('')}
+              className="text-sm text-violet hover:underline"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+        <InterestsList interests={filteredInterests} />
       </Card>
     </div>
   )

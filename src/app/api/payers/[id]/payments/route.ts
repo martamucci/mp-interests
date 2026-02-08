@@ -57,7 +57,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid payer ID' }, { status: 400 })
     }
 
-    const supabase = createAPIClient()
+    const supabase = createAPIClient(true)
 
     // Get payer info
     const { data: payer, error: payerError } = await supabase
@@ -71,7 +71,7 @@ export async function GET(
     }
 
     // Get payments for this payer with MP and category details
-    const { data: payments, error: paymentsError } = await supabase
+    const { data: linkedPayments, error: linkedError } = await supabase
       .from('payments')
       .select(`
         id,
@@ -89,7 +89,34 @@ export async function GET(
       .order('amount', { ascending: false })
       .limit(1000)
 
-    if (paymentsError) throw paymentsError
+    if (linkedError) throw linkedError
+
+    const { data: unlinkedPayments, error: unlinkedError } = await supabase
+      .from('payments')
+      .select(`
+        id,
+        amount,
+        payment_type,
+        role_description,
+        received_date,
+        start_date,
+        member_id,
+        category_id,
+        interest_id
+      `)
+      .is('payer_id', null)
+      .ilike('payer_name', payer.name)
+      .not('amount', 'is', null)
+      .limit(1000)
+
+    if (unlinkedError) throw unlinkedError
+
+    const combinedPayments = [...(linkedPayments || []), ...(unlinkedPayments || [])]
+    const payments = combinedPayments.reduce((acc, payment) => {
+      if (acc.some(existing => existing.id === payment.id)) return acc
+      acc.push(payment)
+      return acc
+    }, [] as typeof combinedPayments)
 
     // Get member, category, and interest details
     const memberIds = [...new Set(payments?.map(p => p.member_id) || [])]

@@ -161,11 +161,6 @@ export default function PayersListPage({ params }: { params: { type: string } | 
     setPage(1)
   }
 
-  const handleSubtypeChange = (value: string) => {
-    setSubtype(value)
-    setPage(1)
-  }
-
   const clearFilters = () => {
     setSearchInput('')
     setSearch('')
@@ -210,11 +205,14 @@ export default function PayersListPage({ params }: { params: { type: string } | 
               className="sm:w-52"
             />
 
-            {/* Category/Subtype filter - hide for governments */}
-            {type !== 'governments' && data?.subtypes && data.subtypes.length > 0 && (
+            {/* Category/Subtype filter - hide for governments and companies */}
+            {type !== 'governments' && type !== 'companies' && data?.subtypes && data.subtypes.length > 0 && (
               <Select
                 value={subtype}
-                onChange={handleSubtypeChange}
+                onChange={(value) => {
+                  setSubtype(value)
+                  setPage(1)
+                }}
                 options={data.subtypes.map(s => ({ value: s, label: s }))}
                 placeholder="All Categories"
                 className="sm:w-48"

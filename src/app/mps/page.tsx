@@ -1,18 +1,106 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import MPList from '@/components/mps/MPList'
 import Select from '@/components/ui/Select'
 import { useMPList } from '@/hooks/useMPList'
 
 export default function MPsPage() {
-  const [page, setPage] = useState(1)
-  const [party, setParty] = useState('')
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [sort, setSort] = useState<'az' | 'high'>('az')
+  const [page, setPage] = useState(() => {
+    if (typeof window === 'undefined') return 1
+    try {
+      const stored = sessionStorage.getItem('mps:state')
+      if (!stored) return 1
+      const parsed = JSON.parse(stored) as { page?: number }
+      return parsed.page ?? 1
+    } catch {
+      return 1
+    }
+  })
+  const [party, setParty] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const stored = sessionStorage.getItem('mps:state')
+      if (!stored) return ''
+      const parsed = JSON.parse(stored) as { party?: string }
+      return parsed.party ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const [search, setSearch] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const stored = sessionStorage.getItem('mps:state')
+      if (!stored) return ''
+      const parsed = JSON.parse(stored) as { search?: string }
+      return parsed.search ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const [searchInput, setSearchInput] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      const stored = sessionStorage.getItem('mps:state')
+      if (!stored) return ''
+      const parsed = JSON.parse(stored) as { searchInput?: string; search?: string }
+      return parsed.searchInput ?? parsed.search ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const [sort, setSort] = useState<'az' | 'high'>(() => {
+    if (typeof window === 'undefined') return 'az'
+    try {
+      const stored = sessionStorage.getItem('mps:state')
+      if (!stored) return 'az'
+      const parsed = JSON.parse(stored) as { sort?: 'az' | 'high' }
+      return parsed.sort ?? 'az'
+    } catch {
+      return 'az'
+    }
+  })
 
   const { data, isLoading, error } = useMPList({ page, party, search, sort })
+
+  const scrollKey = useMemo(() => {
+    const searchKey = search || 'all'
+    const partyKey = party || 'all'
+    return `mps:scroll:${page}:${partyKey}:${searchKey}:${sort}`
+  }, [page, party, search, sort])
+  const hasRestoredScroll = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem('mps:state', JSON.stringify({
+      page,
+      party,
+      search,
+      searchInput,
+      sort,
+    }))
+  }, [page, party, search, searchInput, sort])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = sessionStorage.getItem(scrollKey)
+    if (!saved || hasRestoredScroll.current) return
+    if (isLoading) return
+    const y = Number(saved)
+    if (Number.isFinite(y)) {
+      window.scrollTo(0, y)
+      hasRestoredScroll.current = true
+    }
+  }, [scrollKey, isLoading])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const save = () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY))
+    }
+    return () => save()
+  }, [scrollKey])
 
   const handleSearch = () => {
     setSearch(searchInput)

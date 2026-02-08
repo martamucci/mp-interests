@@ -147,6 +147,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: interest.id,
+        paymentId: interestPayments[0]?.id || null,
         category: interest.category?.name || 'Unknown',
         categoryId: interest.category?.id,
         summary: interest.summary,

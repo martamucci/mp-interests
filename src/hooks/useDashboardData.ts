@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { DashboardSummaryResponse } from '@/types/api'
+import type { TopPayer } from '@/types/database'
 
 export function useDashboardData() {
   const [data, setData] = useState<DashboardSummaryResponse | null>(null)
@@ -61,6 +62,36 @@ export function useTopEarners(filterBy: 'category' | 'party', filterValue: strin
 
     fetchData()
   }, [filterBy, filterValue])
+
+  return { data, isLoading }
+}
+
+export function useTopPayersByType(type: 'Government' | 'Company' | 'Individual') {
+  const [data, setData] = useState<TopPayer[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        const params = new URLSearchParams({
+          type,
+          page: '1',
+          limit: '5',
+          sort: 'high',
+        })
+        const response = await fetch(`/api/payers?${params}`)
+        if (response.ok) {
+          const result = await response.json()
+          setData(result.data || [])
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [type])
 
   return { data, isLoading }
 }
