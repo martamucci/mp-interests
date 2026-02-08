@@ -46,18 +46,7 @@ export async function GET(_request: NextRequest, context: { params: { party: str
       return NextResponse.json({ payments: [] })
     }
 
-    const payments: Array<{
-      id: number
-      amount: number | null
-      payer_name: string | null
-      role_description: string | null
-      hours_worked: number | null
-      hourly_rate: number | null
-      start_date: string | null
-      received_date: string | null
-      member: { id: number; name_display: string; party_name: string; constituency: string | null } | Array<{ id: number; name_display: string; party_name: string; constituency: string | null }> | null
-      interest: { summary: string | null; raw_fields: unknown; registration_date: string | null } | Array<{ summary: string | null; raw_fields: unknown; registration_date: string | null }> | null
-    }> = []
+    const payments: unknown[] = []
 
     const limit = 1000
     let offset = 0
@@ -84,23 +73,35 @@ export async function GET(_request: NextRequest, context: { params: { party: str
         .range(offset, offset + limit - 1)
 
       if (error) throw error
-      payments.push(...((chunk || []) as typeof payments))
+      payments.push(...(chunk || []))
       if (!chunk || chunk.length < limit) break
       offset += limit
     }
 
-    const enrichedPayments = (payments || []).map(payment => {
-      const member = Array.isArray(payment.member) ? payment.member[0] : payment.member
-      const interest = Array.isArray(payment.interest) ? payment.interest[0] : payment.interest
+    const enrichedPayments = (payments || []).map((payment) => {
+      const typed = payment as {
+        id: number
+        amount: number | null
+        payer_name: string | null
+        role_description: string | null
+        hours_worked: number | null
+        hourly_rate: number | null
+        start_date: string | null
+        received_date: string | null
+        member: { id: number; name_display: string; party_name: string; constituency: string | null } | Array<{ id: number; name_display: string; party_name: string; constituency: string | null }> | null
+        interest: { summary: string | null; raw_fields: unknown; registration_date: string | null } | Array<{ summary: string | null; raw_fields: unknown; registration_date: string | null }> | null
+      }
+      const member = Array.isArray(typed.member) ? typed.member[0] : typed.member
+      const interest = Array.isArray(typed.interest) ? typed.interest[0] : typed.interest
       const rawFields = interest?.raw_fields as Array<{ name?: string; value?: string }> | null
-      const date = payment.received_date || payment.start_date || interest?.registration_date || null
+      const date = typed.received_date || typed.start_date || interest?.registration_date || null
       return {
-        id: payment.id,
-        amount: payment.amount,
-        payerName: payment.payer_name,
-        roleDescription: payment.role_description,
-        hoursWorked: payment.hours_worked,
-        hourlyRate: payment.hourly_rate,
+        id: typed.id,
+        amount: typed.amount,
+        payerName: typed.payer_name,
+        roleDescription: typed.role_description,
+        hoursWorked: typed.hours_worked,
+        hourlyRate: typed.hourly_rate,
         date,
         summary: interest?.summary || null,
         purpose: extractFromRawFields(rawFields, ['purpose']),
