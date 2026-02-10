@@ -361,6 +361,7 @@ export class LLMSearchService {
         entities: {},
         limit: DEFAULT_RESULT_LIMIT,
       }
+      const countQuestion = isCountQuestion(query)
       const interpretedQuery = query.trim() || 'your request'
       const stats = buildStats([])
       return {
