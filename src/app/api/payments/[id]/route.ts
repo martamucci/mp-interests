@@ -59,7 +59,8 @@ export async function GET(_request: NextRequest, context: { params: { id: string
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
 
-    const rawFields = payment.interest?.raw_fields as Array<{ name?: string; value?: string }> | null
+    const interest = Array.isArray(payment.interest) ? payment.interest[0] : payment.interest
+    const rawFields = interest?.raw_fields as Array<{ name?: string; value?: string }> | null
 
     return NextResponse.json({
       payment: {
@@ -79,11 +80,11 @@ export async function GET(_request: NextRequest, context: { params: { id: string
         startDate: payment.start_date,
         endDate: payment.end_date,
         receivedDate: payment.received_date,
-        registrationDate: payment.interest?.registration_date || null,
+        registrationDate: interest?.registration_date || null,
         purpose: extractFromRawFields(rawFields, ['purpose']),
         destination: extractFromRawFields(rawFields, ['destination', 'country', 'location']),
         donationDescription: extractFromRawFields(rawFields, ['description of donation', 'description']),
-        summary: payment.interest?.summary || null,
+        summary: interest?.summary || null,
         member: payment.member,
         category: payment.category,
       },
