@@ -120,10 +120,8 @@ import { NextRequest, NextResponse } from 'next/server'
           date,
           summary: interest?.summary || null,
           purpose: extractFromRawFields(rawFields, ['purpose']),
-          destination: extractFromRawFields(rawFields, ['destination',
-  'country', 'location']),
-          donationDescription: extractFromRawFields(rawFields, ['description of
-  donation', 'description']),
+        destination: extractFromRawFields(rawFields, ['destination', 'country', 'location']),
+        donationDescription: extractFromRawFields(rawFields, ['description of donation', 'description']),
           member,
         }
       })
