@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react'
+
 interface Column<T> {
   key: string
-  header: string
+  header: ReactNode
   render?: (item: T, index: number) => React.ReactNode
   className?: string
 }
